@@ -1,0 +1,5 @@
+true: debug, safe_string, bin_annot, warn(-40)
+
+<src>: include
+
+<*/*>: package(core), thread

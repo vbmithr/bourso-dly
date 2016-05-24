@@ -1,0 +1,4 @@
+PRJ bourso
+S src
+B _build/src
+PKG core
