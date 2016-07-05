@@ -8,11 +8,12 @@ let fix_date date_str =
   | _ -> invalid_arg "fix_date"
 
 let fn_of_label label =
-  String.tr_inplace ~target:' ' ~replacement:'_' label;
-  String.tr_inplace ~target:'\'' ~replacement:'_' label;
+  let to_replace = [' '; '\''; '('; ')'; ':'; '/'] in
+  List.iter to_replace ~f:(fun target ->
+      String.tr_inplace ~target ~replacement:'_' label);
   label ^ ".dly"
 
-let process_bourso_line line =
+let process_bourso_line ?(overwrite=false) line =
   match String.split ~on:'\t' line with
   | [label; date; open'; high; low; close; vol] -> begin
       let label = fn_of_label label in
@@ -20,7 +21,7 @@ let process_bourso_line line =
         match String.Table.find ocs label with
         | Some oc -> oc
         | None ->
-          let oc = Out_channel.create ~binary:false ~append:true label in
+          let oc = Out_channel.create ~binary:false ~append:(not overwrite) label in
           String.Table.add_exn ocs ~key:label ~data:oc;
           oc
       in
@@ -32,24 +33,21 @@ let command =
   let spec =
     let open Command.Spec in
     empty
-    +> flag ("-target") (optional string) ~doc:"filename Where to put results"
+    +> flag "-overwrite" no_arg ~doc:" Overwrite files"
     +> anon ("filename" %: string)
+    +> anon ("dirname" %: string)
   in
-  let main target fn () =
+  let main overwrite fn dn () =
     let rec process_line ic =
       match In_channel.input_line ic with
       | None ->
         String.Table.iteri ocs ~f:(fun ~key ~data -> Out_channel.close data)
       | Some line ->
-        process_bourso_line line;
+        process_bourso_line ~overwrite line;
         process_line ic
     in
-    begin match target with
-     | None -> ()
-     | Some dirname ->
-       Unix.mkdir_p dirname;
-       Sys.chdir dirname
-    end;
+    Unix.mkdir_p dn;
+    Sys.chdir dn;
     In_channel.with_file ~binary:false fn ~f:process_line
   in
   Command.basic ~summary:"Convert bourso dly file into SC dly files" spec main
